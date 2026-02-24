@@ -1,74 +1,72 @@
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+<script>
+
 function loadLayer(){
 
- if(geoLayer){
-   map.removeLayer(geoLayer);
- }
+   if(geoLayer){
+      map.removeLayer(geoLayer);
+   }
 
- var level = document.getElementById("level").value;
- var classCount = parseInt(document.getElementById("classes").value);
+   var level = document.getElementById("level").value;
+   var classCount = parseInt(document.getElementById("classes").value);
 
- Promise.all([
-   fetch(level + ".json").then(res => res.json()),
-   fetch(level + ".csv").then(res => res.text())
- ])
- .then(([geoData, csvData]) => {
+   Promise.all([
+      fetch(level + ".json").then(res => res.json()),
+      fetch(level + ".csv").then(res => res.text())
+   ])
+   .then(([geoData, csvData]) => {
 
-   var table = Papa.parse(csvData,{header:true}).data;
+      var table = Papa.parse(csvData,{header:true}).data;
+      var dataMap = {};
 
-   var dataMap = {};
-
-   // ====== 1️⃣ بناء القاموس حسب المستوى ======
-   table.forEach(row=>{
-
-      if(level === "regions"){
-         // الربط عبر OBJECTID
-         var key = row.OBJECTID || row.OBJECTIF;
-      }else{
-         // الربط عبر الاسم
-         var key = row["Libelle Français"];
-      }
-
-      var pop = parseFloat(
-         row["Population municipale (Effectif): Ensemble"]
-      );
-
-      dataMap[key] = pop;
-   });
-
-   // ====== 2️⃣ دمج القيم داخل GeoJSON ======
-   geoData.features.forEach(feature=>{
-
-      var key;
-
-      if(level === "regions"){
-         key = feature.properties.OBJECTID;
-      }else{
-         key = feature.properties.NAME;
-      }
-
-      feature.properties.pop_total = dataMap[key] || 0;
-   });
-
-   var values = geoData.features.map(f=>f.properties.pop_total);
-   var breaks = calculateBreaks(values,classCount);
-
-   geoLayer = L.geoJson(geoData,{
-      style:function(feature){
-         return{
-           fillColor:getColor(feature.properties.pop_total,breaks),
-           weight:1,
-           color:"#333",
-           fillOpacity:0.7
+      table.forEach(row=>{
+         var key;
+         if(level === "regions"){
+            key = row.OBJECTID;
+         }else{
+            key = row["Libelle Français"];
          }
-      },
-      onEachFeature:function(feature,layer){
-         layer.bindPopup(
-           "<b>"+(feature.properties.NAME || "")+"</b><br>"+
-           "السكان: "+feature.properties.pop_total
+
+         var pop = parseFloat(
+            row["Population municipale (Effectif): Ensemble"]
          );
-      }
-   }).addTo(map);
 
- });
+         dataMap[key] = pop;
+      });
 
+      geoData.features.forEach(feature=>{
+         var key;
+         if(level === "regions"){
+            key = feature.properties.OBJECTID;
+         }else{
+            key = feature.properties.NAME;
+         }
+
+         feature.properties.pop_total = dataMap[key] || 0;
+      });
+
+      var values = geoData.features.map(f=>f.properties.pop_total);
+      var breaks = calculateBreaks(values,classCount);
+
+      geoLayer = L.geoJson(geoData,{
+         style:function(feature){
+            return{
+               fillColor:getColor(feature.properties.pop_total,breaks),
+               weight:1,
+               color:"#333",
+               fillOpacity:0.7
+            }
+         },
+         onEachFeature:function(feature,layer){
+            layer.bindPopup(
+               "<b>"+(feature.properties.NAME || "")+"</b><br>"+
+               "السكان: "+feature.properties.pop_total
+            );
+         }
+      }).addTo(map);
+
+   });
 }
+
+</script>
