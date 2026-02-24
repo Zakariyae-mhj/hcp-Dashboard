@@ -1,1 +1,138 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="utf-8" />
+<title>RGPH 2024 Dashboard</title>
 
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<style>
+body { margin:0; font-family: Arial; }
+#map { height:100vh; }
+#panel{
+ position:absolute;
+ top:10px;
+ right:10px;
+ background:white;
+ padding:15px;
+ z-index:1000;
+ border-radius:8px;
+ box-shadow:0 0 10px rgba(0,0,0,0.3);
+}
+</style>
+</head>
+<body>
+
+<div id="panel">
+<h3>اختيار المستوى</h3>
+
+<select id="level">
+<option value="regions">الجهات</option>
+<option value="provinces">الأقاليم</option>
+<option value="communes">الجماعات</option>
+</select>
+
+<br><br>
+
+<label>عدد الفئات</label>
+<select id="classes">
+<option>3</option>
+<option selected>5</option>
+<option>7</option>
+</select>
+
+<br><br>
+<button onclick="loadLayer()">تحديث</button>
+</div>
+
+<div id="map"></div>
+
+<script>
+
+var map = L.map('map').setView([31.5,-7],6);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
+.addTo(map);
+
+var geoLayer;
+var colors = ["#edf8e9","#bae4b3","#74c476","#31a354","#006d2c","#00441b","#002b13"];
+
+function calculateBreaks(values, classCount){
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const interval = (max-min)/classCount;
+    let breaks=[];
+    for(let i=0;i<=classCount;i++){
+        breaks.push(min+i*interval);
+    }
+    return breaks;
+}
+
+function getColor(value, breaks){
+    for(let i=0;i<breaks.length-1;i++){
+        if(value >= breaks[i] && value <= breaks[i+1]){
+            return colors[i];
+        }
+    }
+}
+
+function loadLayer(){
+
+ if(geoLayer){
+   map.removeLayer(geoLayer);
+ }
+
+ var level = document.getElementById("level").value;
+ var classCount = parseInt(document.getElementById("classes").value);
+
+ fetch(level + ".json")
+ .then(res => res.json())
+ .then(data => {
+
+    var values = data.features.map(f =>
+        f.properties.pop_total ||
+        f.properties.POP ||
+        f.properties.population ||
+        0
+    );
+
+    var breaks = calculateBreaks(values,classCount);
+
+    geoLayer = L.geoJson(data,{
+        style:function(feature){
+            var val =
+            feature.properties.pop_total ||
+            feature.properties.POP ||
+            feature.properties.population ||
+            0;
+
+            return{
+                fillColor:getColor(val,breaks),
+                weight:1,
+                color:"#333",
+                fillOpacity:0.7
+            }
+        },
+        onEachFeature:function(feature,layer){
+            layer.bindPopup(
+                "<b>"+(feature.properties.NAME || "بدون اسم")+"</b><br>"+
+                "القيمة: "+
+                (feature.properties.pop_total ||
+                 feature.properties.POP ||
+                 feature.properties.population ||
+                 0)
+            );
+        }
+    }).addTo(map);
+
+ });
+
+}
+
+loadLayer();
+
+</script>
+
+</body>
+</html>
