@@ -1,34 +1,3 @@
-<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-
-<script>
-
-var map = L.map('map').setView([31.5,-7],6);
-
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
-.addTo(map);
-
-var geoLayer;
-var colors = ["#edf8e9","#bae4b3","#74c476","#31a354","#006d2c","#00441b","#002b13"];
-
-function calculateBreaks(values, classCount){
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const interval = (max-min)/classCount;
-    let breaks=[];
-    for(let i=0;i<=classCount;i++){
-        breaks.push(min+i*interval);
-    }
-    return breaks;
-}
-
-function getColor(value, breaks){
-    for(let i=0;i<breaks.length-1;i++){
-        if(value >= breaks[i] && value <= breaks[i+1]){
-            return colors[i];
-        }
-    }
-}
-
 function loadLayer(){
 
  if(geoLayer){
@@ -46,16 +15,38 @@ function loadLayer(){
 
    var table = Papa.parse(csvData,{header:true}).data;
 
-   // تحويل CSV إلى قاموس
    var dataMap = {};
+
+   // ====== 1️⃣ بناء القاموس حسب المستوى ======
    table.forEach(row=>{
-      dataMap[row.CODE] = parseFloat(row.pop_total);
+
+      if(level === "regions"){
+         // الربط عبر OBJECTID
+         var key = row.OBJECTID || row.OBJECTIF;
+      }else{
+         // الربط عبر الاسم
+         var key = row["Libelle Français"];
+      }
+
+      var pop = parseFloat(
+         row["Population municipale (Effectif): Ensemble"]
+      );
+
+      dataMap[key] = pop;
    });
 
-   // دمج القيم داخل geojson
+   // ====== 2️⃣ دمج القيم داخل GeoJSON ======
    geoData.features.forEach(feature=>{
-      var code = feature.properties.CODE;
-      feature.properties.pop_total = dataMap[code] || 0;
+
+      var key;
+
+      if(level === "regions"){
+         key = feature.properties.OBJECTID;
+      }else{
+         key = feature.properties.NAME;
+      }
+
+      feature.properties.pop_total = dataMap[key] || 0;
    });
 
    var values = geoData.features.map(f=>f.properties.pop_total);
@@ -72,7 +63,7 @@ function loadLayer(){
       },
       onEachFeature:function(feature,layer){
          layer.bindPopup(
-           "<b>"+feature.properties.NAME+"</b><br>"+
+           "<b>"+(feature.properties.NAME || "")+"</b><br>"+
            "السكان: "+feature.properties.pop_total
          );
       }
@@ -81,7 +72,3 @@ function loadLayer(){
  });
 
 }
-
-loadLayer();
-
-</script>
